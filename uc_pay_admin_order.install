@@ -1,0 +1,46 @@
+<?php
+
+/**
+ * @file
+ * Handles all things.
+ *
+ */
+
+
+/**
+ *
+ *
+ *
+ */
+function uc_pay_admin_order_install(){
+/*
+	$result = db_select('uc_order_statuses')
+		->condition('order_status_id','pay_admin_order', '=')
+		->execute();
+*/
+    //if(empty($result)){
+	    db_insert('uc_order_statuses')
+		    ->fields(array(
+			    'order_status_id' => 'pay_admin_order',
+			    'title' => t('pay an admin order') ,
+			    'state' => 'in_checkout',
+			    'weight' => '-5',
+			    'locked' => 1,
+		    ))
+		    ->execute();
+  //  }
+
+
+	//drupal_set_installed_schema_version('uc_pay_admin_order', '1000');
+}
+
+/*
+
+function uc_pay_admin_order_update_7001(){
+echo 'uc_pay_admin_order_update_7001';
+
+}
+*/
+function uc_pay_admin_order_uninstall(){
+
+}
