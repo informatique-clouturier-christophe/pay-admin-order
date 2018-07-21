@@ -1,189 +1,143 @@
 <?php
+
+/**
+ * Class uc_pay_admin_order
+ *
+ * i use a class because it s more simply for autoload
+ */
 class uc_pay_admin_order
 {
-
-
 	/**
-	 *
-	 *
-	 *
-	 */
-	private $order_id = 0;
-	private $user = array();
-	private $order = array();
-	private $cart_id = 0;
-
-	/**
-	 * uc_pay_admin_order constructor.
 	 * @param $order_id
-	 *
-	 */
-
-	function __construct()
-	{
-		$this->populate();
-	}
-
-	/**
 	 * @return bool
 	 *
+	 * 	fill the cart and use the order for checkout
+	 *  https://test.cmi-menuiserie.fr/cart/checkout/pay_admin_order/168
 	 */
-	private function populate()
+	public static function fill_cart_from_order($order_id)
 	{
-
 		global $user;
-		$arg3 = arg(3);
-		$order = uc_order_load($arg3);
-		//force user to be logged
-		if ($user->uid == 0) drupal_goto('user', array('query' => drupal_get_destination()));
-		$this->user = $user;
-		//uc_order_load test arg3 & order exist
-		if ($order) {
-			$this->order = $order;
-			$this->order_id = $arg3;
-		} else {
+		$order = uc_order_load($order_id);
+		//some security check
+		if ($order &&
+			$user->uid == $order->uid  &&
+			$order->order_status == 'pay_admin_order'
+		) {
+
+			$cart_id = uc_cart_get_id();
+			$mssg = t("your basket will be emptied and filled with the order");
+
+			$oProducts = $order->products;//order products
+			$cProduct = array('nid' => 0, 'qty' => 1, 'data' => array());//cart product
+			// empty the cart before refill
+			uc_cart_empty($cart_id);
+			/**
+			 *
+			 * put somme items from order in cart for pass the uc_cart_checkout test
+			 * i have wrote this before found the good solution also it's a complete system for load
+			 *
+			 */
+			if (count($oProducts) > 0) {
+				foreach ($oProducts as $oproduct) {
+					//transfer the product order to product cart
+					$nid = $cProduct['nid'] = $oproduct->nid;
+					$cProduct['qty'] = $oproduct->qty;
+					$cProduct['data'] = $oproduct->data;
+					$cProductAttributes = uc_product_get_attributes($nid);
+					$aid = 0;
+
+					//if product use an attribute
+					if (!empty($cProduct['data']['attributes'])) {
+						//add attributes in standard cart product if not exist
+						if (!isset($cProduct['attributes']))
+							//prepare attributes
+							$cProduct['attributes'] = array();
+						//scan data attributes
+						foreach ($cProduct['data']['attributes'] as $kAttribute => $options) {
+							//search id attribute by name attribute
+							foreach ($cProductAttributes as $cProductAttribute) {
+								if ($cProductAttribute->name == $kAttribute) {
+									//create enter for this attribute
+									$aid = intval($cProductAttribute->aid);
+									$cProduct['attributes'][$aid] = 'options';
+									//this is finish for this attribute
+									break;
+								}
+							}
+							// Multiple options for this attribute implies checkbox
+							// attribute, which we must store as an array
+							if (count($options) > 1) {
+								//prepare for multiple option in array
+								$cProduct['attributes'][$aid] = array();
+								foreach ($options as $kOptions => $option) {
+									$oid = intval($kOptions);
+									//push option
+									$cProduct['attributes'][$aid][$oid] = $kOptions;
+								}
+							} //if there is only one option like radio box
+							else {
+								$oid = array_keys($options)[0];
+								$cProduct['attributes'][$aid] = $oid;
+							}
+
+						}
+						//purge data attributes
+						unset($cProduct['data']['attributes']);
+					}
+
+					uc_cart_add_item(
+						$cProduct['nid'],
+						$cProduct['qty'],
+						$cProduct['data'] + module_invoke_all('uc_add_to_cart_data', $cProduct),
+						$cart_id,
+						$mssg,
+						FALSE,
+						TRUE
+					);
+				}
+			}
+			/**
+			 *
+			 * update admin order and fill the cart_order with this id
+			 *
+			 */
+			$order->order_status = 'in_checkout';
+			$order->modified = REQUEST_TIME;
+			uc_order_save($order);
+			$_SESSION['cart_order'] = $order_id;
+			//flag for empty cart if the user leave the checkout system
+			$_SESSION['uc_pay_admin_order_cart_loaded'] = true;
+			//
+			unset($_SESSION['uc_cart_order_rebuild']);
+			return true;
+		}
+		else{
 			drupal_set_message(t("unable to load your order"), 'error');
 			return false;
-		}
-		$this->cart_id = uc_cart_get_id();
 
+		}
 	}
 
 	/**
-	 * @return bool
 	 *
 	 *
 	 *
 	 */
-	public function fill_cart_from_order()
-	{
+	public static function empty_cart(){
 
-		dpm('uc_pay_admin_order_init');
-exit();
-		//products too add (OrderProducts)
-		$oProducts = $this->order->products;
-		//standard cart product
-		$cProduct = array('nid' => 0, 'qty' => 1, 'data' => array());
-		uc_cart_empty($this->cart_id);
-		$mssg = t("your cart as been empty and refill with the order");
-		$_SESSION['uc_cart_order_rebuild'] = true;
+		//update the order
+		$order = uc_order_load($_SESSION['cart_order']);
+		//preserve the order status if the order is not completed
+		if($order->order_status == 'in_checkout')
+			$order->order_status = 'pay_admin_order';
+		$order->modified = REQUEST_TIME ;
+		uc_order_save($order);
+		//reset the cart
 		unset($_SESSION['cart_order']);
+		unset($_SESSION['uc_pay_admin_order_cart_loaded']);
+		$_SESSION['uc_cart_order_rebuild'] = true;
+		uc_cart_empty(uc_cart_get_id() );
+		return true;
 
-
-		/**la solution pour eviter le retour a /cart/ found at function uc_cart_checkout() {
-		 *
-		 *
-		 *   elseif (!empty($_SESSION['uc_cart_order_rebuild'])) {
-		 * drupal_set_message(t('Your shopping cart contents have changed. Please review your order and try again.'));
-		 * drupal_goto('cart');
-		 * }
-		 *
-		 *
-		 * $order->modified < REQUEST_TIME - UC_CART_CHECKOUT_TIMEOUT) {
-		 */
-		/**
-		 * preparation des produits avec atribu et option
-		 *
-		 * le resultat doit etre :
-		 *
-		 * $p => array(
-		 * 'nid' => 65,
-		 * 'qty' => 1,
-		 * 'data' => array(),
-		 * 'attributes' => array(
-		 * 4 => '9',
-		 * ),
-		 * )
-		 * ["data"]=>
-		 * array(4) {
-		 * ["attributes"]=>
-		 * array(1) {
-		 * ["lieu"]=>
-		 * array(1) {
-		 * [10]=> "à distance"
-		 * }
-		 * }
-		 * ["shippable"]=>
-		 * string(1) "0"
-		 * ["type"]=>
-		 * string(10) "formations"
-		 * ["module"]=>
-		 * string(10) "uc_product"
-		 * }
-		 *
-		 *
-		 *
-		 */
-
-
-		if (count($oProducts) > 0) {
-			foreach ($oProducts as $oproduct) {
-				//transfer the product order to product cart
-				$nid = $cProduct['nid'] = $oproduct->nid;
-				$cProduct['qty'] = $oproduct->qty;
-				$cProduct['data'] = $oproduct->data;
-				$cProductAttributes = uc_product_get_attributes($nid);
-				$aid = 0;
-				$oid = 0;
-
-				dvm($cProductAttributes, '$attributes');
-
-
-				//if product use an attribute
-				if (!empty($cProduct['data']['attributes'])) {
-					foreach ($cProduct['data']['attributes'] as $kAttribute => $options) {
-						//search id attribute by name attribute
-						foreach ($cProductAttributes as $cProductAttribute)
-							if ($cProductAttribute->name == $kAttribute) $aid = $cProductAttribute->aid;
-						//search id options
-						foreach ($options as $kOptions => $option)
-							$oid = $kOptions;
-						//create attributes
-						$cProduct['attributes'] = array(intval($aid) => $oid);
-					}
-					unset($cProduct['data']['attributes']);
-				}
-
-				dvm($cProduct, '$cProduct');
-
-				uc_cart_add_item(
-					$cProduct['nid'],
-					$cProduct['qty'],
-					$cProduct['data'] + module_invoke_all('uc_add_to_cart_data', $cProduct),
-					$this->cart_id,
-					$mssg,
-					FALSE,
-					TRUE
-				);
-			}
-//dvm(uc_cart_get_contents($cart_id),'after fill up');
-			return TRUE;
-		} else {
-			drupal_set_message(t("there is no product in your order "), 'warning');
-			return FALSE;
-		}
-
-	}
-
-	/**
-	 *
-	 * test if the order
-	 * @return mixed : BOOL || error mssg
-	 *
-	 */
-	public function test_order()
-	{
-		//test if this is the good page
-		if (arg(2) == 'pay_admin_order') {
-			//
-			if ($this->user->uid == $this->order->uid
-					|| user_access('view all orders') === true) {
-				switch ($this->order->order_status) {
-					case 'pay_admin_order':
-						return true;
-				}
-			}
-		}
-		return FALSE;
 	}
 }

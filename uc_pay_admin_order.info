@@ -7,20 +7,13 @@ package = Ubercart - core (optional)
 files[] = uc_pay_admin_order.install
 files[] = uc_pay_admin_order.module
 files[] = uc_pay_admin_order.controller.inc
-files[] = uc_pay_admin_order.admin.inc
-
-
-; files[] = uc_pay_admin_order.form.inc
 
 dependencies[] = uc_order
 dependencies[] = uc_cart
-dependencies[] = uc_adv_mngnt
 
-
-; configure = admin/store/settings/adv_mgmt/pay_admin_order
 
 ; Information added by drupal.org packaging script on 2013-10-19
-version = "7.x-1.x-beta"
+version = "7.x-1.x"
 core = "7.x"
 project = "uc_adv_mgnt"
 datestamp = "1529411782"

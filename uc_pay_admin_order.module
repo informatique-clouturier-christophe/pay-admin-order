@@ -1,14 +1,19 @@
 <?php
-
 /**
  * @file
  * Handles all things concerning pay_admin_order.
  *
- * The order system allows for backend create order but ubercart don't propose to the costumer a call back on checkout
- * page with the order admin.
- * this module propose to fix it
+ * for hack uc_cart_checkout you need:
+ * 1) have 1 or more item in the cart
+ * 2) pass the id of the admin order in $_SESSION['cart_order']
+ * 3) the order must have the statuse 'in_checkout'
+ * 4) the order must have modified in last 30min
+ * 5) the $_SESSION['uc_cart_order_rebuild'] must be empty
+ * to prevent the modification of the order i lock the customer in the checkout page, for that i set
+ * $_SESSION['uc_pay_admin_order_cart_loaded'] to true when i fill the cart order and unset this and empty the cart if
+ * the arg 2 is not 'checkout'
  *
- *
+ * for development it's useful too activate the uc_cart_link debug with uc_cart_links_add_show too true
  */
 
 /**
@@ -18,151 +23,25 @@
  */
 function uc_pay_admin_order_init() {
 
+	if (arg(2) == 'pay_admin_order') {
 
+		$order_id = arg(3);
+		if(uc_pay_admin_order::fill_cart_from_order($order_id))
+			drupal_goto('cart/checkout');
+		else
+			drupal_goto('cart');
 
-
-	return true;
-}
-/**
- * Implements hook_uc_cart_checkout_start().
- *
- *
- */
-function uc_pay_admin_order_uc_cart_checkout_start(){
-
-	dpm ('uc_pay_admin_order_uc_cart_checkout_start');
-
-	$Uc_pay_admin_order = new uc_pay_admin_order();
-
-	$Uc_pay_admin_order->fill_cart_from_order();
-
-	if(($mssg = $Uc_pay_admin_order->test_order()) !== true){
-		if($mssg !== false ) drupal_set_message(t("unable to load your order, error mssg :".$mssg), 'error');
-		drupal_goto('cart');
-		return false;
 	}
-	else{
-		$Uc_pay_admin_order->fill_cart_from_order();
-		return true;
+	if(isset($_SESSION['uc_pay_admin_order_cart_loaded']) &&
+		arg(1) != 'checkout' &&
+		arg(0) != 'ajaxblocks' &&   // bullshit i have that in my system...
+		arg(0) != 'js')             // bullshit
+
+	{
+
+		uc_pay_admin_order::empty_cart();
+		drupal_set_message(t("your cart has been emptied"), 'warning');
 	}
 }
 
-/**
- * Implements hook_uc_cart_alter().
- *
- *
- */
-function uc_pay_admin_order_uc_cart_alter(&$items) {
-	if(!empty($items)){
 
-		$orderId = arg(3);
-		$order = uc_order_load($orderId);
-		$products = $order->products;
-
-		foreach($items as $itemkey => $item) {
-			foreach ($products as $productskey => $product){
-				if($product->nid == $item->nid){
-					//$item->price = $product->price;
-				}
-			}
-		}
-	//	$_SESSION['uc_cart_order_rebuild'] = false;
-	}
-}
-
-function uc_pay_admin_order_uc_order_state(){
-	//$statuses = uc_order_status_list();
-/*
-	$statuses= array(
-		"title"=>t("pay admin order"),
-		"state"=>"in_checkout",
-		"weight"=> "0",
-		"locked"=> "0",
-		"id"=> "pay_admin_order",
-
-	);
-
-	return $statuses;
-*/
-}
-/**
- * @return array
- *
- * Implements hook_permission().
- *
- */
-function uc_pay_admin_order_permission() {
-	 $permissions = array(
-		'pay order' => array(
-			'title' => t('pay order '),
-			'description' => t('customer can access too own order for pay'),
-			// (optional) A boolean which can be set to TRUE to indicate that site administrators should restrict access to this permission to trusted users
-			'restrict access' => true,
-			//  (optional) A translated warning message to display for this permission on the permission administration page
-			'warning' => t( 'A translated warning message')
-		),
-		'config pay order' => array(
-			 'title' => t('config pay order '),
-			 'description' => t('customer can access too own order for pay'),
-			// (optional) A boolean which can be set to TRUE to indicate that site administrators should restrict access to this permission to trusted users
-			 'restrict access' => true,
-			//  (optional) A translated warning message to display for this permission on the permission administration page
-			 'warning' =>  t('A translated warning message')
-		),
-
-	);
-	 return $permissions;
-}
-
-/**
- * @return array()
- *
- *  Implements hook_menu().
- *
- */
-function  uc_pay_admin_order_menu()
-{
-	$items=array();
-
-	$items['admin/store/settings/adv_mngnt/pay_order'] = array(
-		'title' => 'config pay admin order',
-		'description' => 'manage the back end of pay order',
-		'position' => 'left',
-		'weight' => -10,
-		'page callback' => 'uc_pay_admin_order_config',
-		'access arguments' => array('config pay order'),
-		'file' => 'uc_pay_admin_order.admin.inc'
-	);
-/*
-	$items['cart/pay_admin_order/%'] = array(
-		'title' => 'Shopping cart',
-		'description' => 'View/modify the contents of your shopping cart or proceed to checkout.',
-		'page callback' => 'uc_cart_view',
-		'access arguments' => array('access content'),
-		'file' => 'uc_cart.pages.inc',
-		'file path' => drupal_get_path('module', 'uc_cart'),
-	);
-*/
-	return $items;
-}
-
-
-/**
- * Implements hook_form_alter().
- */
-function  uc_pay_admin_order_form_alter($form, &$form_state, $form_id) {
-	//
-		switch ($form_id ){
-			case 'uc_cart_checkout_review_form':
-
-
-				break;
-
-			case 'uc_cart_checkout_form':
-
-
-				break;
-		}
-
-
-}

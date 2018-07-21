@@ -2,23 +2,18 @@
 
 /**
  * @file
- * Handles all things.
+ *
  *
  */
 
 
 /**
- *
+ * Implements hook_install().
  *
  *
  */
 function uc_pay_admin_order_install(){
-/*
-	$result = db_select('uc_order_statuses')
-		->condition('order_status_id','pay_admin_order', '=')
-		->execute();
-*/
-    //if(empty($result)){
+
 	    db_insert('uc_order_statuses')
 		    ->fields(array(
 			    'order_status_id' => 'pay_admin_order',
@@ -28,19 +23,27 @@ function uc_pay_admin_order_install(){
 			    'locked' => 1,
 		    ))
 		    ->execute();
-  //  }
-
-
-	//drupal_set_installed_schema_version('uc_pay_admin_order', '1000');
 }
 
-/*
 
+/**
+ *
+ * implements hook_update().
+ *
+ */
+/*
 function uc_pay_admin_order_update_7001(){
-echo 'uc_pay_admin_order_update_7001';
+
 
 }
 */
+/**
+ *
+ * implements hook_uninstall().
+ *
+ */
 function uc_pay_admin_order_uninstall(){
-
+	db_delete('uc_order_statuses')
+		->condition('order_status_id', 'pay_admin_order', 'LIKE')
+		->execute();
 }
