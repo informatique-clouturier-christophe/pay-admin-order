@@ -17,6 +17,7 @@ class uc_pay_admin_order
 	public static function fill_cart_from_order($order_id)
 	{
 		global $user;
+		if ($user->uid == 0) drupal_goto('user', array('query' => drupal_get_destination()));
 		$order = uc_order_load($order_id);
 		//some security check
 		if ($order &&
