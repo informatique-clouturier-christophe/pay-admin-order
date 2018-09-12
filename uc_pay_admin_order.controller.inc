@@ -44,6 +44,11 @@ class uc_pay_admin_order
 					$nid = $cProduct['nid'] = $oproduct->nid;
 					$cProduct['qty'] = $oproduct->qty;
 					$cProduct['data'] = $oproduct->data;
+					//
+					$cProduct['data']['pay_admin_order'] = array(
+						'uc_pay_admin_order_cart_loaded' => true,
+						'order_id'=>$order_id
+					);
 					$cProductAttributes = uc_product_get_attributes($nid);
 					$aid = 0;
 
@@ -104,10 +109,11 @@ class uc_pay_admin_order
 			 */
 			$order->order_status = 'in_checkout';
 			$order->modified = REQUEST_TIME;
+			$order->data['pay_admin_order'] = array(
+				'uc_pay_admin_order_cart_loaded'=>true //flag for empty cart if the user leave the checkout system
+			);
 			uc_order_save($order);
 			$_SESSION['cart_order'] = $order_id;
-			//flag for empty cart if the user leave the checkout system
-			$_SESSION['uc_pay_admin_order_cart_loaded'] = true;
 			//
 			unset($_SESSION['uc_cart_order_rebuild']);
 			return true;

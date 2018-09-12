@@ -21,26 +21,55 @@
  *
  *
  */
-function uc_pay_admin_order_init() {
-
+function uc_pay_admin_order_init()
+{
+	// fill the cart from order and redirect the user to normal checkout if all is ok or the cart if there a problem
 	if (arg(2) == 'pay_admin_order') {
-
 		$order_id = arg(3);
-		if(uc_pay_admin_order::fill_cart_from_order($order_id))
+		if (uc_pay_admin_order::fill_cart_from_order($order_id))
 			drupal_goto('cart/checkout');
 		else
 			drupal_goto('cart');
-
 	}
-	if(isset($_SESSION['uc_pay_admin_order_cart_loaded']) &&
-		arg(1) != 'checkout' &&
+
+
+	//if user go out of checkout and the cart is from to pay_admin_order process empty the cart and protect the admin order
+	if(	arg(1) != 'checkout' &&
 		arg(0) != 'ajaxblocks' &&   // bullshit i have that in my system...
-		arg(0) != 'js')             // bullshit
+		arg(0) != 'js'              // bullshit
+	){
 
-	{
+		//check if the cart is from to pay_admin_order
+		$uc_cart_content = uc_cart_get_contents();
+			foreach ($uc_cart_content as $value) {
+				if (isset($value->data['pay_admin_order']['uc_pay_admin_order_cart_loaded']) &&
+					$value->data['pay_admin_order']['uc_pay_admin_order_cart_loaded'] === true
+				) {
+					//reset the order to pay_admin_order statement
+					$order_id = $value->data['pay_admin_order']['order_id'];
+					$order = uc_order_load($order_id);
 
-		uc_pay_admin_order::empty_cart();
-		drupal_set_message(t("your cart has been emptied"), 'warning');
+					if($order->order_status == 'in_checkout') {
+						$order->order_status = 'pay_admin_order';
+						$order->modified = REQUEST_TIME;
+						$order->data['pay_admin_order'] = array(
+							'uc_pay_admin_order_cart_loaded' => false //flag for empty cart if the user leave the checkout system
+						);
+						uc_order_save($order);
+						//
+						uc_pay_admin_order::empty_cart();
+						//
+						$_SESSION['cart_order'] = $order_id;
+						//
+						$_SESSION['uc_cart_order_rebuild'] = true;
+						unset($_SESSION['cart_order']);
+
+						drupal_set_message(t("your cart has been emptied"), 'warning');
+						break;
+					}
+				}
+			}
+
 	}
 }
 
